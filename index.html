@@ -720,6 +720,9 @@ svg.leaflet-image-layer.leaflet-interactive path {
     position:fixed;inset:0;z-index:95;background:var(--preto);
     display:grid;place-items:center;
   }
+  /* trava de segurança: some sozinha por CSS, mesmo que o código quebre */
+  .entrada{animation:entradaSocorro .45s ease 4.2s forwards}
+  @keyframes entradaSocorro{ to{ opacity:0; visibility:hidden; pointer-events:none } }
   .entrada.saindo{animation:entradaSai .4s cubic-bezier(.4,0,.2,1) forwards}
   .entrada.fim{display:none}
   @keyframes entradaSai{to{opacity:0;transform:scale(1.03)}}
@@ -760,7 +763,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .carga i{display:block;height:100%;width:0;background:var(--ouro);animation:enche 2.2s ease-out .2s forwards}
   @keyframes enche{to{width:100%}}
 
-  body.abrindo main,body.abrindo header,body.abrindo .barra-abas{opacity:0}
+  body.abrindo main,body.abrindo header{opacity:0;animation:aparece .4s ease 4.3s forwards}
   body.entrou main,body.entrou header,body.entrou .barra-abas{
     animation:sobe .4s cubic-bezier(.4,0,.2,1) both;
   }
@@ -1138,13 +1141,34 @@ svg.leaflet-image-layer.leaflet-interactive path {
 //# sourceMappingURL=leaflet.js.map</script>
 <script>
 /* =====================================================================
+   ABERTURA
+   ===================================================================== */
+(function abertura(){
+  const tela = document.getElementById("entrada");   // $ ainda não existe aqui
+  if(!tela) return;
+  const parado = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let saiu = false;
+  function sair(){
+    if(saiu) return;
+    saiu = true;
+    tela.classList.add("saindo");
+    document.body.classList.remove("abrindo");
+    document.body.classList.add("entrou");
+    setTimeout(() => tela.classList.add("fim"), 440);
+  }
+  tela.addEventListener("click", sair);
+  setTimeout(sair, parado ? 300 : 2600);
+  setTimeout(sair, 6000);
+})();
+
+/* =====================================================================
    NUVEM — preencha depois de implantar o rota-sync.gs
    ===================================================================== */
 const NUVEM = {
   URL: "https://script.google.com/macros/s/AKfycbzzEgor10i5ddUHVAkNqY8wtEaCqEZnzppLRBs9nlmPiSf82Q0kygDUSR4kfxz1Splt5g/exec",
   AUTO: true
 };
-const CHAVE_EMBUTIDA = "";                 // deixe vazio para pedir no aparelho
+const CHAVE_EMBUTIDA = "vext-rota2026";   // embutida: o app não pergunta mais
 const CHAVE_LOCAL = "rota.chave.v1";
 const chaveAtual = () => {
   try{ return localStorage.getItem(CHAVE_LOCAL) || CHAVE_EMBUTIDA; }
@@ -1339,7 +1363,11 @@ function motivoFraca(e){
   if(nomeGenerico(e.nome, e.categoria)) return "nome genérico";
   return "";
 }
-const $ = id => document.getElementById(id);
+const $ = id => {
+  const el = document.getElementById(id);
+  if(!el) console.warn("elemento não encontrado:", id);
+  return el;
+};
 
 const SEMENTES = [
   { title:"Clínica Sorriso Adrianópolis", categoryName:"Dentista",
@@ -1421,10 +1449,10 @@ function normalizar(e){
     bairro: e.bairro || e.neighborhood || bairroDoEndereco(end),
     telefone: tel,
     site: e.site || e.website || "",
-    nota: Number(e.nota ?? e.totalScore ?? e.rating ?? 0) || 0,
-    avaliacoes: Number(e.avaliacoes ?? e.reviewsCount ?? e.userRatingCount ?? 0) || 0,
-    lat: Number(e.lat ?? e.latitude ?? (e.location && e.location.lat)) || null,
-    lng: Number(e.lng ?? e.longitude ?? (e.location && e.location.lng)) || null,
+    nota: Number(e.nota || e.totalScore || e.rating || 0) || 0,
+    avaliacoes: Number(e.avaliacoes || e.reviewsCount || e.userRatingCount || 0) || 0,
+    lat: Number(e.lat || e.latitude || (e.location && e.location.lat)) || null,
+    lng: Number(e.lng || e.longitude || (e.location && e.location.lng)) || null,
     status: e.status || "A verificar",
     anotacao: e.anotacao || "",
     mexido: e.mexido || 0
@@ -1819,30 +1847,17 @@ document.addEventListener("keydown", e => {
   else if($("modalChave").classList.contains("on")) fechar($("modalChave"));
 });
 
-/* =====================================================================
-   ABERTURA
-   ===================================================================== */
-(function abertura(){
-  const tela = $("entrada");
-  const parado = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let saiu = false;
-  function sair(){
-    if(saiu) return;
-    saiu = true;
-    tela.classList.add("saindo");
-    document.body.classList.remove("abrindo");
-    document.body.classList.add("entrou");
-    setTimeout(() => tela.classList.add("fim"), 440);
-  }
-  tela.addEventListener("click", sair);
-  setTimeout(sair, parado ? 300 : 2600);
-  setTimeout(sair, 6000);
-})();
-
-carregar();
-desenhar();
-if(NUVEM.URL && !chaveAtual()) setTimeout(() => abrirChave(), 2900);
-else if(nuvemLigada() && NUVEM.AUTO) setTimeout(() => sincronizar(true), 2800);
+try{
+  carregar();
+  desenhar();
+  if(NUVEM.URL && !chaveAtual()) setTimeout(() => abrirChave(), 2900);
+  else if(nuvemLigada() && NUVEM.AUTO) setTimeout(() => sincronizar(true), 2800);
+}catch(err){
+  console.error("início:", err);
+  document.getElementById("lista").innerHTML =
+    '<div class="vazio">Algo falhou ao iniciar.<br><br>' +
+    '<span style="font-size:12px">' + String(err) + '</span></div>';
+}
 </script>
 </body>
 </html>
