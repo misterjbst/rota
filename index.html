@@ -721,7 +721,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     display:grid;place-items:center;
   }
   /* trava de segurança: some sozinha por CSS, mesmo que o código quebre */
-  .entrada{animation:entradaSocorro .45s ease 4.2s forwards}
+  .entrada{animation:entradaSocorro .45s ease 3.4s forwards}
   @keyframes entradaSocorro{ to{ opacity:0; visibility:hidden; pointer-events:none } }
   .entrada.saindo{animation:entradaSai .4s cubic-bezier(.4,0,.2,1) forwards}
   .entrada.fim{display:none}
@@ -733,15 +733,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
     fill:none;stroke:var(--prata);stroke-width:9;stroke-linecap:round;
     stroke-dasharray:6 17;
     stroke-dashoffset:260;
-    animation:tracar 1.5s cubic-bezier(.45,.05,.25,1) .2s forwards;
+    animation:tracar .78s cubic-bezier(.45,.05,.25,1) .1s forwards;
   }
   @keyframes tracar{to{stroke-dashoffset:0}}
   .rota-inicio{fill:var(--prata);opacity:0;animation:aparece .3s ease .18s forwards}
   .rota-pino{
     fill:var(--ouro);opacity:0;transform-origin:center bottom;
-    animation:cai .5s cubic-bezier(.3,1.4,.4,1) 1.55s forwards;
+    animation:cai .42s cubic-bezier(.3,1.4,.4,1) .8s forwards;
   }
-  .rota-furo{fill:var(--preto);opacity:0;animation:aparece .3s ease 1.85s forwards}
+  .rota-furo{fill:var(--preto);opacity:0;animation:aparece .25s ease 1.05s forwards}
   @keyframes aparece{to{opacity:1}}
   @keyframes cai{
     0%{opacity:0;transform:translateY(-26px) scale(.7)}
@@ -750,20 +750,20 @@ svg.leaflet-image-layer.leaflet-interactive path {
   }
   .marca-anim .nome{
     font-size:19px;font-weight:600;letter-spacing:.34em;color:var(--tinta);
-    opacity:0;animation:aparece .5s ease 1.9s forwards;text-transform:uppercase;
+    opacity:0;animation:aparece .35s ease 1.0s forwards;text-transform:uppercase;
   }
   .marca-anim .sub{
     font-size:11px;letter-spacing:.18em;color:var(--fraca);margin-top:7px;
-    opacity:0;animation:aparece .5s ease 2.1s forwards;text-transform:uppercase;
+    opacity:0;animation:aparece .35s ease 1.15s forwards;text-transform:uppercase;
   }
   .carga{
     width:120px;height:2px;border-radius:2px;background:var(--linha);
     margin:26px auto 0;overflow:hidden;
   }
-  .carga i{display:block;height:100%;width:0;background:var(--ouro);animation:enche 2.2s ease-out .2s forwards}
+  .carga i{display:block;height:100%;width:0;background:var(--ouro);animation:enche 1.2s ease-out .1s forwards}
   @keyframes enche{to{width:100%}}
 
-  body.abrindo main,body.abrindo header{opacity:0;animation:aparece .4s ease 4.3s forwards}
+  body.abrindo main,body.abrindo header{opacity:0;animation:aparece .4s ease 3.5s forwards}
   body.entrou main,body.entrou header,body.entrou .barra-abas{
     animation:sobe .4s cubic-bezier(.4,0,.2,1) both;
   }
@@ -1133,7 +1133,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 <div class="toast" id="toast"></div>
 
-<script>/* @preserve
+<script type="text/leaflet" id="codigoMapa">/* @preserve
  * Leaflet 1.9.4, a JS library for interactive maps. https://leafletjs.com
  * (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade
  */
@@ -1143,22 +1143,37 @@ svg.leaflet-image-layer.leaflet-interactive path {
 /* =====================================================================
    ABERTURA
    ===================================================================== */
+/* =====================================================================
+   ABERTURA
+   Sai assim que o quadro estiver pronto. O tempo mínimo existe só para
+   a animação não piscar; ela não segura o aplicativo.
+   ===================================================================== */
+var PRONTO = false, SAIU_ABERTURA = false;
+
 (function abertura(){
-  const tela = document.getElementById("entrada");   // $ ainda não existe aqui
+  var tela = document.getElementById("entrada");   // $ ainda não existe aqui
   if(!tela) return;
-  const parado = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let saiu = false;
+
+  var parado = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var MINIMO = parado ? 200 : 1100;                // o bastante para ler a marca
+  var comeco = Date.now();
+
   function sair(){
-    if(saiu) return;
-    saiu = true;
+    if(SAIU_ABERTURA) return;
+    SAIU_ABERTURA = true;
     tela.classList.add("saindo");
     document.body.classList.remove("abrindo");
     document.body.classList.add("entrou");
-    setTimeout(() => tela.classList.add("fim"), 440);
+    setTimeout(function(){ tela.classList.add("fim"); }, 420);
   }
-  tela.addEventListener("click", sair);
-  setTimeout(sair, parado ? 300 : 2600);
-  setTimeout(sair, 6000);
+
+  window.__fecharAbertura = function(){
+    var falta = MINIMO - (Date.now() - comeco);
+    falta > 0 ? setTimeout(sair, falta) : sair();
+  };
+
+  tela.addEventListener("click", sair);            // toque pula
+  setTimeout(sair, 3000);                          // trava de segurança
 })();
 
 /* =====================================================================
@@ -1581,9 +1596,27 @@ const escapar = t => String(t==null?"":t)
    ===================================================================== */
 let mapa = null, camada = null;
 
+/* o Leaflet só é interpretado na primeira vez que o mapa é aberto:
+   tira cerca de 150 KB do trabalho de abertura do aplicativo */
+var mapaPronto = false;
+function prepararMapa(){
+  if(mapaPronto || typeof L !== "undefined"){ mapaPronto = true; return true; }
+  try{
+    var fonte = document.getElementById("codigoMapa");
+    if(!fonte) return false;
+    (0, eval)(fonte.textContent);
+    mapaPronto = (typeof L !== "undefined");
+  }catch(err){
+    console.warn("mapa:", err);
+    mapaPronto = false;
+  }
+  return mapaPronto;
+}
+
 function verMapa(){
   $("wrapMapa").classList.remove("oculto");
   $("lista").classList.add("oculto");
+  prepararMapa();
   if(typeof L === "undefined"){
     $("mapa").innerHTML = '<div style="padding:44px 22px;text-align:center;color:var(--fraca);font-size:13.5px">Não consegui carregar o mapa.<br>Use a lista por enquanto.</div>';
     return;
@@ -1850,8 +1883,10 @@ document.addEventListener("keydown", e => {
 try{
   carregar();
   desenhar();
-  if(NUVEM.URL && !chaveAtual()) setTimeout(() => abrirChave(), 2900);
-  else if(nuvemLigada() && NUVEM.AUTO) setTimeout(() => sincronizar(true), 2800);
+  PRONTO = true;
+  if(window.__fecharAbertura) window.__fecharAbertura();
+  if(NUVEM.URL && !chaveAtual()) setTimeout(() => abrirChave(), 1600);
+  else if(nuvemLigada() && NUVEM.AUTO) setTimeout(() => sincronizar(true), 1500);
 }catch(err){
   console.error("início:", err);
   document.getElementById("lista").innerHTML =
